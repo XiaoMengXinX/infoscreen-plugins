@@ -1,0 +1,15 @@
+{
+	"id": "lvgl",
+	"api_version": 2,
+	"version": "1.0",
+	"name": {
+		"zh": "LVGL 桌面",
+		"en": "LVGL desktop"
+	},
+	"description": {
+		"zh": "切换到原生 LVGL 界面",
+		"en": "Switch to the native LVGL interface"
+	},
+	"entry": "index.html",
+	"order": 90
+}

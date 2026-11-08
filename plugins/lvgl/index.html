@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>LVGL 桌面</title>
+<style>
+:root {
+ color-scheme: dark;
+ --bg: #0c121b;
+ --surface-rgb: 24,33,46;
+ --active-rgb: 28,57,55;
+ --text: #f1f5fa;
+ --dim: #96a5b9;
+ --line: #283444;
+ --accent: #85ebcd;
+ --ui-opacity: 1;
+}
+:root[data-theme="light"] { color-scheme: light; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px "Noto Sans CJK SC", "DejaVu Sans", sans-serif; cursor: none; user-select: none; }
+html.desktop-wallpaper, html.desktop-wallpaper body { background: transparent; }
+body { display: flex; flex-direction: column; gap: 10px; padding: 10px 14px; }
+.card { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(var(--surface-rgb), var(--ui-opacity)); }
+h1 { margin: 0 0 6px; font-size: 16px; }
+p { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.5; }
+button { height: 44px; border: 0; border-radius: 12px; background: rgba(var(--active-rgb), var(--ui-opacity)); color: var(--accent); font: inherit; font-size: 15px; cursor: none; outline: none; }
+button:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+button:disabled { color: var(--dim); }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<section class="card">
+ <h1 id="title"></h1>
+ <p id="note"></p>
+</section>
+<button id="switch" type="button" hidden></button>
+<script src="/sdk/e5.js"></script>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const button = $('switch');
+// Not installed until /status says so; armed between the first press and the second.
+let installed = false, armed = false, switching = false;
+
+function syncTheme() {
+ let host = null;
+ try { host = window.parent.document.body; } catch (error) { return; }
+ const palette = window.parent.getComputedStyle(host);
+ for (const name of ['--bg', '--surface-rgb', '--active-rgb', '--text', '--dim', '--line', '--accent', '--ui-opacity']) {
+  const value = palette.getPropertyValue(name).trim();
+  if (value) document.documentElement.style.setProperty(name, value);
+ }
+ document.documentElement.dataset.theme = host.dataset.theme || 'dark';
+ document.documentElement.classList.toggle('desktop-wallpaper', host.classList.contains('desktop-wallpaper'));
+}
+
+function render() {
+ document.documentElement.lang = e5.lang === 'en' ? 'en' : 'zh';
+ $('title').textContent = e5.t({ zh: 'LVGL 桌面', en: 'LVGL desktop' });
+ $('note').textContent = installed
+  ? e5.t({ zh: '切换到原生 LVGL 界面，屏幕会重新启动。在 LVGL 的 设置 → 系统 里可以切换回网页界面。',
+           en: 'Switches the screen to the native LVGL interface, which restarts it. LVGL\'s Settings → System switches back.' })
+  : e5.t({ zh: '没有安装 LVGL 界面。在电脑上运行 e5-infoscreen-lvgl 的安装脚本安装后，就可以在这里切换。',
+           en: 'The LVGL interface is not installed. Once e5-infoscreen-lvgl\'s install script has run from a computer, it switches here.' });
+ button.hidden = !installed;
+ button.disabled = switching;
+ button.textContent = switching ? e5.t({ zh: '正在切换…', en: 'Switching…' })
+  : armed ? e5.t({ zh: '再按一次切换', en: 'Press again to switch' })
+  : e5.t({ zh: '切换到 LVGL 桌面', en: 'Switch to LVGL' });
+}
+
+async function press() {
+ if (!armed) {
+  armed = true;
+  render();
+  return;
+ }
+ switching = true;
+ render();
+ try {
+  await e5.api('/switch', { body: {} });
+ } catch (error) {
+  switching = false;
+  armed = false;
+  render();
+  e5.toast(e5.t({ zh: '切换失败', en: 'The switch failed' }));
+ }
+}
+
+button.addEventListener('click', press);
+button.addEventListener('blur', () => { armed = false; render(); });
+e5.onKey((key) => {
+ if (key.kind !== 'ok' || button.hidden) return false;
+ e5.press(button);
+ return true;
+});
+e5.onLang(render);
+window.addEventListener('focus', syncTheme);
+
+syncTheme();
+render();
+e5.api('/status').then((r) => {
+ installed = r.installed === true;
+ render();
+ if (installed) button.focus();
+}).catch(() => {});
+</script>
+</body>
+</html>
